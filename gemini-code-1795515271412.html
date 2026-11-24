@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistem Absensi Face Recognition & Manual</title>
+  <!-- Pustaka face-api.js dari CDN jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 16px;
+    }
+
+    .container {
+      max-width: 1150px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--card);
+      padding: 18px 24px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 1.35rem;
+      color: var(--primary);
+    }
+
+    .status-badge {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-badge.ready {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-badge.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .grid-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Kamera & Overlay */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #0f172a;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .camera-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Form & Buttons */
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-outline {
+      background: #fff;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: #f8fafc; }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 0.8rem;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    /* Alert Toast */
+    .toast {
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: none;
+    }
+
+    .toast.show { display: block; }
+    .toast.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .toast.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .toast.info { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+
+    /* Table */
+    .table-responsive {
+      overflow-x: auto;
+      max-height: 360px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+      font-weight: 700;
+    }
+
+    .pill {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .pill-face { background: #dbeafe; color: #1e40af; }
+    .pill-manual { background: #f3e8ff; color: #6b21a8; }
+    .pill-hadir { background: #dcfce7; color: #166534; }
+    .pill-izin { background: #fef3c7; color: #92400e; }
+    .pill-sakit { background: #ffedd5; color: #9a3412; }
+    .pill-alpa { background: #fee2e2; color: #991b1b; }
+
+    .divider {
+      margin: 18px 0;
+      border: 0;
+      border-top: 1px dashed var(--border);
+    }
+
+    .small-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Sistem Absensi Face Recognition & Manual</h1>
+        <p style="font-size: 0.85rem; color: var(--muted);" id="clockDisplay">Memuat waktu...</p>
+      </div>
+      <div id="modelStatus" class="status-badge">Memuat Model AI Wajah...</div>
+    </header>
+
+    <div id="toastBox" class="toast"></div>
+
+    <div class="grid-layout">
+      <!-- Kolom Kiri: Kamera Live -->
+      <div class="card">
+        <h2>Kamera Pemindai Wajah</h2>
+        <div class="video-wrapper">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="camera-controls">
+          <label class="toggle-row">
+            <input type="checkbox" id="autoScanToggle" checked />
+            Auto-Absen saat wajah dikenali
+          </label>
+          <button id="btnToggleCam" class="btn btn-outline btn-sm">Matikan Kamera</button>
+        </div>
+        <p class="small-note" id="detectInfo">Status: Menunggu kamera & model siap...</p>
+      </div>
+
+      <!-- Kolom Kanan: Panel Kontrol & Rekap -->
+      <div class="card">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('tabAbsen', this)">1. Absensi</button>
+          <button class="tab-btn" onclick="switchTab('tabDaftar', this)">2. Daftar Wajah (<span id="countUsers">0</span>)</button>
+          <button class="tab-btn" onclick="switchTab('tabRekap', this)">3. Rekap (<span id="countLogs">0</span>)</button>
+        </div>
+
+        <!-- TAB 1: ABSENSI FACE RECOGNITION & MANUAL -->
+        <div id="tabAbsen" class="tab-content active">
+          <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid var(--border);">
+            <h3 style="font-size: 0.98rem; margin-bottom: 6px;">Scan Face Recognition</h3>
+            <p style="font-size: 0.86rem; color: var(--muted); margin-bottom: 10px;">
+              Arahkan wajah ke kamera. Jika fitur <b>Auto-Absen</b> aktif, kehadiran tercatat otomatis. Anda juga dapat menekan tombol di bawah untuk memindai manual.
+            </p>
+            <button id="btnManualFaceScan" class="btn btn-primary" disabled>
+              Pindai & Catat Wajah Sekarang
+            </button>
+          </div>
+
+          <hr class="divider" />
+
+          <h3 style="font-size: 0.98rem; margin-bottom: 10px;">Input Absensi Manual (Cadangan / Izin / Sakit)</h3>
+          <form id="manualForm">
+            <div class="form-group">
+              <label for="manualSelectUser">Pilih dari Data Terdaftar (Opsional)</label>
+              <select id="manualSelectUser">
+                <option value="">-- Ketik nama baru di bawah atau pilih --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="manualName">Nama Lengkap *</label>
+              <input type="text" id="manualName" placeholder="Contoh: Budi Santoso" required />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label for="manualId">ID / NIS / Kelas</label>
+                <input type="text" id="manualId" placeholder="Contoh: XII-IPA-1" />
+              </div>
+              <div class="form-group">
+                <label for="manualStatus">Status Kehadiran</label>
+                <select id="manualStatus">
+                  <option value="Hadir">Hadir</option>
+                  <option value="Izin">Izin</option>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Alpa">Alpa</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success" style="width: 100%;">
+              Simpan Absensi Manual
+            </button>
+          </form>
+        </div>
+
+        <!-- TAB 2: REGISTRASI WAJAH -->
+        <div id="tabDaftar" class="tab-content">
+          <form id="registerForm">
+            <div class="form-group">
+              <label for="regName">Nama Lengkap *</label>
+              <input type="text" id="regName" placeholder="Masukkan nama lengkap" required />
+            </div>
+            <div class="form-group">
+              <label for="regId">ID / NIS / Kelas *</label>
+              <input type="text" id="regId" placeholder="Contoh: 10245 / XI-A" required />
+            </div>
+            <button type="submit" id="btnRegisterFace" class="btn btn-primary" style="width: 100%;" disabled>
+              Ambil Sampel Wajah & Simpan
+            </button>
+          </form>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+            <button onclick="exportFaceDB()" class="btn btn-outline btn-sm">Backup Data Wajah (.JSON)</button>
+            <label class="btn btn-outline btn-sm" style="margin: 0; cursor: pointer;">
+              Restore (.JSON)
+              <input type="file" accept=".json" onchange="importFaceDB(event)" style="display: none;" />
+            </label>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID / Kelas</th>
+                  <th>Nama</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="registeredTableBody">
+                <tr><td colspan="3" style="text-align:center; color:var(--muted);">Belum ada wajah terdaftar.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 3: REKAP & EXPORT -->
+        <div id="tabRekap" class="tab-content">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <input type="date" id="filterDate" style="padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;" />
+            <div style="display: flex; gap: 6px;">
+              <button onclick="exportCSV()" class="btn btn-success btn-sm">Export Excel (CSV)</button>
+              <button onclick="clearLogs()" class="btn btn-danger btn-sm">Hapus Log</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>ID/Kelas</th>
+                  <th>Nama</th>
+                  <th>Metode</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceTableBody">
+                <tr><td colspan="5" style="text-align:center; color:var(--muted);">Belum ada data absensi.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Konfigurasi URL Model AI dari CDN (tidak perlu file lokal tambahan)
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+    const STORAGE_FACES_KEY = 'gh_absensi_faces_v1';
+    const STORAGE_LOGS_KEY = 'gh_absensi_logs_v1';
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('overlay');
+    const modelStatus = document.getElementById('modelStatus');
+    const detectInfo = document.getElementById('detectInfo');
+    const btnRegisterFace = document.getElementById('btnRegisterFace');
+    const btnManualFaceScan = document.getElementById('btnManualFaceScan');
+    const btnToggleCam = document.getElementById('btnToggleCam');
+
+    let isModelLoaded = false;
+    let isCameraOn = false;
+    let stream = null;
+    let scanInterval = null;
+    let faceMatcher = null;
+
+    // Data tersimpan di browser (localStorage)
+    let registeredFaces = JSON.parse(localStorage.getItem(STORAGE_FACES_KEY) || '[]');
+    let attendanceLogs = JSON.parse(localStorage.getItem(STORAGE_LOGS_KEY) || '[]');
+
+    // Set tanggal filter default ke hari ini
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('filterDate').value = todayStr;
+    document.getElementById('filterDate').addEventListener('change', renderLogs);
+
+    // Jam digital real-time
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clockDisplay').textContent = now.toLocaleDateString('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      }) + ' • ' + now.toLocaleTimeString('id-ID');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Notifikasi Toast
+    function showToast(message, type = 'info') {
+      const box = document.getElementById('toastBox');
+      box.textContent = message;
+      box.className = `toast show ${type}`;
+      clearTimeout(box._timer);
+      box._timer = setTimeout(() => { box.className = 'toast'; }, 4000);
+    }
+
+    // Bunyi beep konfirmasi (Web Audio API tanpa file MP3)
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch (e) {}
+    }
+
+    // Navigasi Tab
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // Membangun FaceMatcher dari data localStorage
+    function rebuildFaceMatcher() {
+      if (registeredFaces.length === 0) {
+        faceMatcher = null;
+        return;
+      }
+      const labeledDescriptors = registeredFaces.map(person => {
+        const descriptorFloat32 = new Float32Array(person.descriptor);
+        return new faceapi.LabeledFaceDescriptors(`${person.id}|${person.name}`, [descriptorFloat32]);
+      });
+      // Threshold 0.50 (semakin kecil semakin ketat kecocokannya)
+      faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.50);
+    }
+
+    // Memuat Model AI Face Recognition
+    async function loadModels() {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        isModelLoaded = true;
+        modelStatus.textContent = 'Model AI Siap';
+        modelStatus.classList.add('ready');
+        btnRegisterFace.disabled = false;
+        btnManualFaceScan.disabled = false;
+        rebuildFaceMatcher();
+        startCamera();
+      } catch (err) {
+        console.error(err);
+        modelStatus.textContent = 'Gagal Memuat Model AI';
+        modelStatus.classList.add('error');
+        showToast('Gagal memuat model AI. Pastikan koneksi internet aktif.', 'error');
+      }
+    }
+
+    // Menyalakan Kamera
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        isCameraOn = true;
+        btnToggleCam.textContent = 'Matikan Kamera';
+        video.onloadedmetadata = () => {
+          startDetectionLoop();
+        };
+      } catch (err) {
+        console.error(err);
+        detectInfo.textContent = 'Kamera tidak dapat diakses. Pastikan izin kamera aktif & berjalan di HTTPS (GitHub Pages).';
+        showToast('Akses kamera ditolak atau tidak tersedia.', 'error');
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      clearInterval(scanInterval);
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      isCameraOn = false;
+      btnToggleCam.textContent = 'Nyalakan Kamera';
+      detectInfo.textContent = 'Status: Kamera dimatikan.';
+    }
+
+    btnToggleCam.addEventListener('click', () => {
+      if (isCameraOn) stopCamera();
+      else startCamera();
+    });
+
+    // Loop Deteksi Wajah Real-Time
+    function startDetectionLoop() {
+      clearInterval(scanInterval);
+      scanInterval = setInterval(async () => {
+        if (!isModelLoaded || !isCameraOn || video.paused || video.ended) return;
+
+        const displaySize = { width: video.videoWidth, height: video.videoHeight };
+        if (displaySize.width === 0) return;
+        faceapi.matchDimensions(canvas, displaySize);
+
+        const detections = await faceapi
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (resizedDetections.length === 0) {
+          detectInfo.textContent = 'Status: Tidak ada wajah terdeteksi.';
+          return;
+        }
+
+        resizedDetections.forEach(det => {
+          const box = det.detection.box;
+          let labelText = 'Wajah Belum Terdaftar';
+          let boxColor = '#f59e0b';
+
+          if (faceMatcher) {
+            const bestMatch = faceMatcher.findBestMatch(det.descriptor);
+            if (bestMatch.label !== 'unknown') {
+              const [personId, personName] = bestMatch.label.split('|');
+              const confidence = Math.round((1 - bestMatch.distance) * 100);
+              labelText = `${personName} (${confidence}%)`;
+              boxColor = '#16a34a';
+
+              // Jika Auto-Absen aktif, catat otomatis
+              if (document.getElementById('autoScanToggle').checked) {
+                recordAttendance(personId, personName, 'Face Recognition', 'Hadir', true);
+              }
+            }
+          }
+
+          const drawBox = new faceapi.draw.DrawBox(box, {
+            label: labelText,
+            boxColor: boxColor
+          });
+          drawBox.draw(canvas);
+          detectInfo.textContent = `Terdeteksi: ${labelText}`;
+        });
+      }, 450);
+    }
+
+    // Tombol Scan Wajah Manual (jika Auto-Absen dimatikan)
+    btnManualFaceScan.addEventListener('click', async () => {
+      if (!isCameraOn) return showToast('Nyalakan kamera terlebih dahulu.', 'error');
+      if (!faceMatcher) return showToast('Belum ada data wajah terdaftar.', 'error');
+
+      const det = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!det) return showToast('Wajah tidak terlihat jelas. Posisikan wajah di depan kamera.', 'error');
+
+      const bestMatch = faceMatcher.findBestMatch(det.descriptor);
+      if (bestMatch.label === 'unknown') {
+        showToast('Wajah tidak dikenali. Silakan daftarkan wajah atau gunakan Absensi Manual.', 'error');
+      } else {
+        const [personId, personName] = bestMatch.label.split('|');
+        recordAttendance(personId, personName, 'Face Recognition', 'Hadir', false);
+      }
+    });
+
+    // Registrasi Wajah Baru
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!isCameraOn) return showToast('Nyalakan kamera untuk mengambil sampel wajah.', 'error');
+
+      const name = document.getElementById('regName').value.trim();
+      const id = document.getElementById('regId').value.trim();
+
+      btnRegisterFace.disabled = true;
+      btnRegisterFace.textContent = 'Memproses Wajah...';
+
+      const det = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      btnRegisterFace.disabled = false;
+      btnRegisterFace.textContent = 'Ambil Sampel Wajah & Simpan';
+
+      if (!det) {
+        return showToast('Wajah tidak terdeteksi! Pastikan cahaya terang & menghadap kamera.', 'error');
+      }
+
+      // Perbarui jika ID sudah ada, atau tambah baru
+      const existingIndex = registeredFaces.findIndex(p => p.id.toLowerCase() === id.toLowerCase());
+      const newEntry = {
+        id,
+        name,
+        descriptor: Array.from(det.descriptor)
+      };
+
+      if (existingIndex > -1) {
+        registeredFaces[existingIndex] = newEntry;
+      } else {
+        registeredFaces.push(newEntry);
+      }
+
+      localStorage.setItem(STORAGE_FACES_KEY, JSON.stringify(registeredFaces));
+      rebuildFaceMatcher();
+      renderRegisteredUsers();
+      document.getElementById('registerForm').reset();
+      playBeep();
+      showToast(`Wajah ${name} (${id}) berhasil didaftarkan!`, 'success');
+    });
+
+    // Pencatatan Log Absensi (mencegah duplikasi di hari yang sama)
+    function recordAttendance(id, name, method, status, isAuto = false) {
+      const currentDate = new Date().toISOString().split('T')[0];
+      const alreadyLogged = attendanceLogs.some(
+        log => log.date === currentDate && log.name.toLowerCase() === name.toLowerCase() && log.id.toLowerCase() === id.toLowerCase()
+      );
+
+      if (alreadyLogged) {
+        if (!isAuto) {
+          showToast(`${name} sudah tercatat absen hari ini.`, 'info');
+        }
+        return;
+      }
+
+      const now = new Date();
+      const entry = {
+        id: id || '-',
+        name,
+        date: currentDate,
+        time: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        method,
+        status
+      };
+
+      attendanceLogs.unshift(entry);
+      localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(attendanceLogs));
+      renderLogs();
+      playBeep();
+      showToast(`Berhasil Absen: ${name} (${method} - ${status})`, 'success');
+    }
+
+    // Form Absensi Manual
+    document.getElementById('manualSelectUser').addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      const [id, name] = e.target.value.split('|');
+      document.getElementById('manualId').value = id;
+      document.getElementById('manualName').value = name;
+    });
+
+    document.getElementById('manualForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('manualName').value.trim();
+      const id = document.getElementById('manualId').value.trim() || '-';
+      const status = document.getElementById('manualStatus').value;
+
+      recordAttendance(id, name, 'Manual', status, false);
+      document.getElementById('manualForm').reset();
+    });
+
+    // Render Tabel Pengguna Terdaftar
+    function renderRegisteredUsers() {
+      const tbody = document.getElementById('registeredTableBody');
+      const select = document.getElementById('manualSelectUser');
+      document.getElementById('countUsers').textContent = registeredFaces.length;
+
+      select.innerHTML = '<option value="">-- Ketik nama baru di bawah atau pilih --</option>';
+      registeredFaces.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = `${p.id}|${p.name}`;
+        opt.textContent = `${p.name} (${p.id})`;
+        select.appendChild(opt);
+      });
+
+      if (registeredFaces.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--muted);">Belum ada wajah terdaftar.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = registeredFaces.map((p, idx) => `
+        <tr>
+          <td>${p.id}</td>
+          <td><b>${p.name}</b></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${idx})">Hapus</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function deleteUser(index) {
+      if (!confirm(`Hapus data wajah ${registeredFaces[index].name}?`)) return;
+      registeredFaces.splice(index, 1);
+      localStorage.setItem(STORAGE_FACES_KEY, JSON.stringify(registeredFaces));
+      rebuildFaceMatcher();
+      renderRegisteredUsers();
+      showToast('Data wajah dihapus.', 'info');
+    }
+
+    // Render Tabel Rekap Absensi
+    function renderLogs() {
+      const tbody = document.getElementById('attendanceTableBody');
+      const selectedDate = document.getElementById('filterDate').value;
+      const filtered = selectedDate
+        ? attendanceLogs.filter(l => l.date === selectedDate)
+        : attendanceLogs;
+
+      document.getElementById('countLogs').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted);">Tidak ada data absensi pada tanggal ini.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(log => {
+        const methodClass = log.method === 'Face Recognition' ? 'pill-face' : 'pill-manual';
+        const statusClass = `pill-${log.status.toLowerCase()}`;
+        return `
+          <tr>
+            <td>${log.time}</td>
+            <td>${log.id}</td>
+            <td><b>${log.name}</b></td>
+            <td><span class="pill ${methodClass}">${log.method}</span></td>
+            <td><span class="pill ${statusClass}">${log.status}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Export Rekap ke CSV (Bisa langsung dibuka di Excel)
+    function exportCSV() {
+      const selectedDate = document.getElementById('filterDate').value;
+      const dataToExport = selectedDate
+        ? attendanceLogs.filter(l => l.date === selectedDate)
+        : attendanceLogs;
+
+      if (dataToExport.length === 0) {
+        return showToast('Tidak ada data untuk diunduh.', 'error');
+      }
+
+      let csv = '\uFEFFTanggal;Waktu;ID/Kelas;Nama;Metode;Status\n';
+      dataToExport.forEach(row => {
+        csv += `${row.date};${row.time};"${row.id}";"${row.name}";${row.method};${row.status}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Rekap_Absensi_${selectedDate || 'Semua'}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Backup & Restore Database Wajah (JSON)
+    function exportFaceDB() {
+      if (registeredFaces.length === 0) return showToast('Belum ada data wajah untuk dibackup.', 'error');
+      const blob = new Blob([JSON.stringify(registeredFaces)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Database_Wajah_${todayStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importFaceDB(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!Array.isArray(imported)) throw new Error('Format tidak valid');
+          registeredFaces = imported;
+          localStorage.setItem(STORAGE_FACES_KEY, JSON.stringify(registeredFaces));
+          rebuildFaceMatcher();
+          renderRegisteredUsers();
+          showToast(`Berhasil memulihkan ${registeredFaces.length} data wajah.`, 'success');
+        } catch (err) {
+          showToast('File JSON tidak valid.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function clearLogs() {
+      if (!confirm('Hapus seluruh riwayat log absensi di browser ini?')) return;
+      attendanceLogs = [];
+      localStorage.removeItem(STORAGE_LOGS_KEY);
+      renderLogs();
+      showToast('Riwayat absensi dikosongkan.', 'info');
+    }
+
+    // Inisialisasi awal
+    renderRegisteredUsers();
+    renderLogs();
+    loadModels();
+  </script>
+</body>
+</html>
